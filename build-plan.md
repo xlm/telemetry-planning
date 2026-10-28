@@ -10,6 +10,7 @@ Decisions already made (do not reopen during the build): see the "Shared underst
 telemetry-migration/
 ├── CONTEXT.md                      # glossary (copy from this planning repo)
 ├── Makefile                        # setup, doctor, gate, goldens, fixtures, test, fmt, lint
+├── rust-toolchain.toml             # pins Rust 1.99.1 with rustfmt and clippy; rustup, CI and make doctor read it
 ├── .gitignore                      # evidence/ except evidence/ota-status/
 ├── README.md
 ├── docs/
@@ -67,8 +68,9 @@ telemetry-migration/
 │   │   ├── downstream.py           # runs downstream/warranty.py over both outputs, diffs
 │   │   ├── privacy.py              # Manifest diff vs Baseline plus runtime scan
 │   │   ├── evidence.py             # Evidence Pack, JSON and Markdown
-│   │   └── gate.py                 # CLI: `uv run gate --processor X`
-│   └── tests/
+│   │   ├── gate.py                 # CLI: `uv run gate --processor X`
+│   │   └── ci.py                   # CLI: `uv run gate-processors --base X` - which Processors a PR must Gate
+│   └── tests/                      # incl. Processor selection and CODEOWNERS coverage
 ├── downstream/
 │   └── warranty.py                 # never on screen, never modified
 ├── evidence/
@@ -76,6 +78,9 @@ telemetry-migration/
 ├── deploy/
 │   ├── docker-compose.yaml         # Redpanda, optional, Phase 2
 │   └── k8s/                        # illustrative manifests only
+├── .github/
+│   ├── workflows/gate.yml          # the Gate on every PR, plus build-cache warming on main (Phase 2 onward)
+│   └── CODEOWNERS                  # every protected path plus Makefile, rust-toolchain.toml, AGENTS.md, CONTEXT.md, .agents/
 ├── AGENTS.md                       # always-on: commands, read-only Gate inputs (Phase 2 onward)
 └── .agents/skills/migrate-job/SKILL.md   # the migration procedure, invoked as @skills:migrate-job <job> (Phase 2 onward)
 ```
@@ -83,7 +88,7 @@ telemetry-migration/
 ## Toolchain
 
 - JDK 17, sbt 1.x, Spark 3.5.x in local mode (`local[2]`). No cluster, no Kafka for Goldens.
-- Rust stable, `cargo`. `rdkafka` only under `--features kafka`, with `cmake-build` so it does not require a system librdkafka when someone does turn it on.
+- Rust 1.99.1, pinned in `rust-toolchain.toml` (rustup, `make setup` and `make doctor` all read it), `cargo`. `rdkafka` only under `--features kafka`, with `cmake-build` so it does not require a system librdkafka when someone does turn it on.
 - Python 3.12, `uv`, `ruff`, `pytest`. `jsonschema`, `pyyaml`, `click`. Nothing else unless unavoidable.
 - `make` as the single entry point. Targets: `setup`, `doctor`, `gate PROCESSOR=`, `goldens JOB=`, `fixtures`, `test`, `fmt`, `lint`.
 
@@ -222,12 +227,22 @@ The Job manifest is the Baseline. The Processor manifest is what Devin writes or
 2. **Contract.** Every output record validates against `contracts/charging-session.v1.schema.json` (`additionalProperties: false`). Semantic assertions: `start_ts <= end_ts`, `energy_kwh >= 0`, `event_count >= 1`, one summary per `session_id`.
 3. **Downstream System.** Run `downstream/warranty.py` over Golden and candidate output. It emits one line per session: `{session_id, flag}` where `flag` is `HIGH_ENERGY_PER_SOC` if `energy_kwh / max(end_soc - start_soc, 1) > 1.5`, `TIMEOUT` if `close_reason == TIMEOUT`, else `OK`. Diff the two result sets. Report `N sessions, M identical flags`.
 4. **Privacy.** (a) Diff Processor manifest against Baseline: new output fields, removed fields, classification changes, purpose changes, new topics, new downstream, retention change, logging change. (b) Runtime scan. Outputs: every record's keys must be a subset of the manifest's declared fields for that topic, and no output value may equal a `location` value from the fixture unless the manifest declares a location field on that topic. Logs: no line may contain a `location` value or a raw `vehicle_id` from the fixture (the 12-hex hash is fine). Findings carry a disposition: `no-material-change`, `clarification`, `violation`, `new-processing`.
-5. **Path check.** `git diff --name-only <base>..HEAD` must not touch `goldens/`, `fixtures/`, `manifests/*.job.yaml`, `harness/`, `contracts/`, `jobs/`, `downstream/`. Base is `origin/main` unless `--base` is given. This list must match `AGENTS.md` exactly.
+5. **Path check.** `git diff --name-only <base>..HEAD` must not touch `goldens/`, `fixtures/`, `manifests/*.job.yaml`, `manifests/classification.yaml`, `harness/`, `contracts/`, `jobs/`, `downstream/`, `.github/` or `schemas/`. Base is `origin/main` unless `--base` is given. This list must match `AGENTS.md` exactly. `.github/CODEOWNERS` covers the same list plus `Makefile`, `rust-toolchain.toml`, `AGENTS.md`, `CONTEXT.md` and `.agents/`; a test keeps CODEOWNERS equal to that set.
 6. **Evidence Pack.** Write `evidence/<processor>/<short-sha>/evidence.json` and `evidence.md` with sections: identity (processor, sha, manifest versions, timestamp, command to reproduce), inventory (from manifest), change assessment (Baseline diff), validation (steps 1-5 with counts), disposition (worst finding wins), residual uncertainties (a fixed honest list: fixture coverage, runtime scan is value-based not flow-based, no broker semantics tested). Exit non-zero if any step is red.
 
 The Markdown must be readable in a PR description. Keep it under 150 lines.
 
-`evidence/` is gitignored, with `!evidence/ota-status/` as the one exception so the exemplar from Job #1 is in the tree. A Migration's Evidence Pack reaches reviewers through the PR description (the skill pastes it verbatim), not through a commit, which keeps the Migration diff confined to `processors/<name>/` and `manifests/<name>.processor.yaml`.
+`evidence/` is gitignored, with `!evidence/ota-status/` as the one exception so the exemplar from Job #1 is in the tree. A Migration's Evidence Pack reaches reviewers through the PR description (the skill pastes it verbatim and refreshes it after every push), not through a commit, which keeps the Migration diff confined to `processors/<name>/` and `manifests/<name>.processor.yaml`.
+
+Every pull request also runs the Gate in GitHub Actions (`.github/workflows/gate.yml`), as three numbered jobs:
+
+1. `1. Select Processors` runs `gate-processors --base origin/<base_ref>`: a Processor's own crate or `manifests/<name>.processor.yaml` selects that Processor; a Gate input, `Makefile`, `rust-toolchain.toml` or any other path under `processors/` selects every Processor; anything else selects none.
+2. `2. Gate: <name>`, one job per selected Processor, runs `make gate` on the PR head commit. Its job summary page shows the Evidence Pack, and it uploads `gate-<name>` (evidence plus raw output) and `result-<name>` (the final `Gate: ...` line) as artifacts.
+3. `3. Gate verdict` aggregates everything: green iff step 1 succeeded and every selected Processor recorded `Gate: GREEN`, with a skipped `2. Gate` counting as green (a PR may select no Processor). It runs with `if: always()` because GitHub treats a skipped required check as passing. Its summary page tables each Processor's result. It is the only check `main` requires, because the number of `2. Gate` jobs varies per PR. This check on the PR head commit is the verdict that counts; a local `make gate` is a preview of it.
+
+The Gate runs the PR's own `harness/` and workflow, so the Path check cannot guard itself: a branch that drops a rule and edits the harness would pass its own Gate. GitHub reads CODEOWNERS from the base branch, so "Require review from Code Owners" on `main` closes that gap.
+
+On pushes to `main` and on manual dispatch, `Warm the build cache (main only)` builds every Processor and saves the shared Rust cache. Push-to-verdict is about 60 s warm, about 3 min cold. The cache is keyed on the Rust version, so a `rust-toolchain.toml` bump needs a manual warm afterwards: Actions, Gate, Run workflow on `main`.
 
 ## Phase 1 - four build sessions
 
@@ -464,6 +479,15 @@ Read both files once more before pushing; the SKILL.md is the thing you show on 
 
 ## Phase 2 - sequential
 
+### Post-merge order (before any D-step)
+
+1. Rebase-merge #10 (the Gate in GitHub Actions) with the admin bypass. Its own `3. Gate verdict` is red at Path check by design, because it touches Gate inputs.
+2. Confirm `Warm the build cache (main only)` passes on `main`.
+3. Add the `main` ruleset: `3. Gate verdict` as the only required check, Require review from Code Owners, rebase only, linear history, 1 approval, dismiss stale approvals, admin bypass for pull requests only.
+4. Land the executive-facing Evidence Pack PR - a separate PR to make Evidence Packs friendlier for executives, designed first - so it is on `main` before the D2 cut.
+
+Cut no demo branch before this lands: a branch without the workflow never reports `3. Gate verdict`, and one cut before #10 merges carries the old Path check rules (no `.github/`, `schemas/` or `manifests/classification.yaml`).
+
 ### D1 - Confirm the skill is discovered
 
 `AGENTS.md` and `.agents/skills/migrate-job/SKILL.md` were moved into place at the end of Phase 1. Devin indexes `SKILL.md` files from connected repos at session start, so open a throwaway session on `main` and ask it to list available skills. `migrate-job` must appear. If it does not, check the frontmatter parses (the `description` field is what Devin reads to decide relevance). Terminate the throwaway session.
@@ -472,9 +496,11 @@ The skill has `triggers: ["user"]`, so Devin will not auto-invoke it. That is de
 
 ### D2 - Pre-run migration session
 
+Only after the post-merge order above: `demo/charging-session-migrated` must carry the workflow and the new Path check rules.
+
 Start on `main`. Prompt: `@skills:migrate-job charging-session`
 
-Expected: green PR on a `devin/...` branch. Rename or recreate that branch as `demo/charging-session-migrated` so the demo states are stable. Leave the PR open. Trigger Devin Review on it.
+Expected: a PR on a `devin/...` branch with the `3. Gate verdict` check green. Skill step 7 has Devin wait for that check and read each red `2. Gate: <name>` job log: a log with a Gate report counts toward the three attempts like a Drift, a log with no Gate report is an infrastructure failure (re-run once, then report), and after every push the Evidence Pack in the PR description is refreshed. Rename or recreate that branch as `demo/charging-session-migrated` so the demo states are stable. Leave the PR open. Trigger Devin Review on it.
 
 If the session stops at a stop condition, read why. If the skill or Scala is at fault, fix and re-run once. If Devin genuinely cannot determine a rule, that is also a demo moment, but prefer a clean green run for narration.
 
@@ -484,6 +510,8 @@ From `demo/charging-session-migrated`:
 
 - `drift/dedup-and-idle`: change the dedup key to `event_id` and make the idle timeout use a wall-clock `Instant` instead of the Vehicle Clock. Keep the code plausible, as if written by someone who had not read the Scala carefully. Confirm `make gate` is red on the Harness for exactly fixtures 04 (extra accepted events, wrong `event_count`) and 09 (missing `TIMEOUT` summaries), green on every other fixture, red on the Downstream System for exactly fixture 09 (its 8 `TIMEOUT` flags missing), and green on contract and privacy. Record the SHA.
 - `violation/location-in-summary`: add `end_location` to the Rust summary struct, populated from the last accepted event's `location`, without touching the manifest or the contract. Confirm `make gate` is red on contract (`additionalProperties`), red on privacy (undeclared field carrying a sensitive-location value on an output topic), and that the Harness shows extra-field diffs on every fixture. Record the SHA.
+
+Then open a draft PR from `violation/location-in-summary` into `main` and keep it open: `3. Gate verdict` goes red with privacy named in the result table, and the `2. Gate: charging-session` summary page shows the Evidence Pack's finding. It is the privacy beat's visual in the run of show; its fallbacks are a closed rehearsal PR of the same branch and the terminal.
 
 ### D4 - Backup run of the live prompt
 
@@ -505,7 +533,7 @@ Full run of show twice, with a timer. Second time, simulate the live session bei
 | `main` | Job #1 migrated, Job #2 Scala + Goldens + Rust scaffold | red (todo!) | pre-run session start |
 | `demo/charging-session-migrated` | Devin's green port, PR open | green | narration, PR, Devin Review |
 | `drift/dedup-and-idle` | port with two planted Drifts | red on Harness 04 and 09, Downstream System 09 | live session start, backup session |
-| `violation/location-in-summary` | port leaking location | red, contract + privacy | terminal beat |
+| `violation/location-in-summary` | port leaking location | red, contract + privacy | draft PR (red `3. Gate verdict` at privacy); terminal fallback |
 
 Record each branch's SHA here after D3:
 
@@ -524,7 +552,7 @@ for b in main demo/charging-session-migrated drift/dedup-and-idle violation/loca
   git checkout -q $b && git reset -q --hard origin/$b
 done
 git branch --list 'devin/*' | xargs -r git branch -D
-gh pr list --author devin-ai-integration --state open   # close anything that is not the demo PR
+gh pr list --author devin-ai-integration --state open   # close anything that is not the demo PR or the violation draft PR
 ```
 
 ## Cut order if Phase 2 runs hot

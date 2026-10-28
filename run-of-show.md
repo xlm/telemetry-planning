@@ -16,9 +16,11 @@ The expensive part of moving the remaining Jobs is not writing Rust, it is provi
 4. Devin cloud: the completed backup run of the live prompt (in case the live one is slow).
 5. GitHub: `.agents/skills/migrate-job/SKILL.md` rendered.
 6. GitHub: `AGENTS.md` rendered, scrolled to "Gate inputs are read-only".
-7. Terminal in a local clone, on `violation/location-in-summary`, with `make gate PROCESSOR=charging-session` typed but not run.
+7. Terminal in a local clone, on `violation/location-in-summary`, with `make gate PROCESSOR=charging-session` typed but not run (fallback for screen 11).
 8. `docs/cutover.md` rendered.
 9. DeepWiki page for the repo (optional, objection 5).
+10. GitHub: the demo PR's checks - the `3. Gate verdict` summary page (per-Processor result table, green) and, one click in, the `2. Gate: charging-session` summary page showing the same Evidence Pack.
+11. GitHub: the draft PR from `violation/location-in-summary` into `main` - its `3. Gate verdict` summary page open, red, with privacy named in the result table.
 
 Do not have a slide deck open. The repo and the sessions are the deck.
 
@@ -43,22 +45,22 @@ If the Architect asks how Devin learns an undocumented Job: screen 9, DeepWiki, 
 
 ### 3:00 - 7:00 The pre-run Migration
 
-Screen 5 for 30 seconds: the `migrate-job` skill. Read the step headings, the stop conditions and the acceptance criteria out loud. "Every Job from here on starts with this. It is a file in the repo, so your architects review changes to the process the same way they review code."
+Screen 5 for 30 seconds: the `migrate-job` skill. Read the step headings, the stop conditions and the acceptance criteria out loud. Step 7 is worth the extra seconds: Devin waits for the `3. Gate verdict` check, reads each red `2. Gate: <name>` job log (a Gate report counts toward the three attempts like a Drift; no report is an infrastructure failure, re-run once then report), and refreshes the Evidence Pack in the PR description after every push. Acceptance is `3. Gate verdict` green on the PR, not a local run. "Every Job from here on starts with this. It is a file in the repo, so your architects review changes to the process the same way they review code."
 
 Screen 3: the completed session. Scroll, do not read. Narrate the shape:
 
 1. Devin read the Scala and wrote down the business rules it found (point at the characterisation notes it produced).
 2. It implemented the Rust Processor against the existing skeleton.
 3. It ran the Gate. Show the first red Gate if there was one in the session, then the green one.
-4. It generated the Evidence Pack and opened the PR.
+4. It generated the Evidence Pack, opened the PR, and waited for `3. Gate verdict` to go green (step 7).
 
-Screen 2: the PR. Three things: diff is confined to `processors/charging-session/` and `manifests/charging-session.processor.yaml`. Evidence Pack in the description. Devin Review findings below it. "Devin Review is a second agent reviewing the first. A human still merges."
+Screen 2: the PR. Three things: diff is confined to `processors/charging-session/` and `manifests/charging-session.processor.yaml`. Evidence Pack in the description. Devin Review findings below it. Then screen 10 for five seconds: `3. Gate verdict` green - the one check `main` requires - its summary page tables each Processor's result, and the `2. Gate: charging-session` summary shows the same Evidence Pack. "Devin Review is a second agent reviewing the first. A human still merges."
 
 Say the honest sentence once: "The Gate proves equivalence on these fixtures, under these checks. It does not prove production safety. What it does is turn a two-week discovery exercise into a 20-minute read."
 
 ### 7:00 - 9:00 The Gate going red for privacy
 
-Screen 7. Say: "Here is a branch where the port looks fine and the Harness is green, but the Processor copies the vehicle's last location onto the session summary." Run `make gate PROCESSOR=charging-session`. Red. Point at the finding: field `end_location`, classification `sensitive-location`, not permitted on topic `vehicle.charging.sessions`, Baseline unchanged, disposition `policy violation - requires remediation`.
+Screen 11. Say: "Here is a draft PR where the port looks fine and the Harness is green, but the Processor copies the vehicle's last location onto the session summary." `3. Gate verdict` is red, the per-Processor table naming privacy. Open the `2. Gate: charging-session` summary - the Evidence Pack's finding: field `end_location`, classification `sensitive-location`, not permitted on topic `vehicle.charging.sessions`, Baseline unchanged, disposition `policy violation - requires remediation`. If the checks will not load, fall back to the closed rehearsal PR of the same branch; if GitHub is down entirely, screen 7: run `make gate PROCESSOR=charging-session`, same finding in the terminal.
 
 Say: "Nobody rewrote the policy to make this pass, and the Evidence Pack tells a privacy reviewer exactly which field and which rule. That is what 'no lengthy review per Job' actually means: the reviewer reads this, not the code."
 
@@ -66,7 +68,7 @@ Say: "Nobody rewrote the policy to make this pass, and the Evidence Pack tells a
 
 Screen 1. Three outcomes:
 
-- **Finished**: show the PR diff (only Rust files touched), read Devin's root-cause explanation of both Drifts, run `make gate` on its branch locally. Green. Best ending.
+- **Finished**: show the PR diff (only Rust files touched), read Devin's root-cause explanation of both Drifts, show `3. Gate verdict` green on its PR (about 60 s push-to-verdict with a warm cache). Best ending.
 - **Mid-flight**: show where it is (usually it has found the dedup key by now; the Vehicle Clock takes longer because the port's wall-clock version looks reasonable until you read the Scala). Say "I ran this exact prompt yesterday" and switch to screen 4 for the ending. Come back to screen 1 at the end of Q&A if it has finished.
 - **Stuck or wrong**: say so plainly, switch to screen 4. Do not rescue it live.
 
@@ -94,8 +96,8 @@ failure, and fix it in the Rust processor under processors/charging-session/.
 
 Constraints:
 - Do not modify anything under harness/, fixtures/, goldens/, manifests/,
-  contracts/, jobs/ or downstream/. If you believe one of those is wrong,
-  stop and say so.
+  contracts/, jobs/, downstream/, .github/ or schemas/. If you believe one
+  of those is wrong, stop and say so.
 - The Scala job in jobs/charging-session/ is the source of truth for
   behaviour. Read it before changing the Rust.
 
@@ -127,6 +129,7 @@ Lead with the artefact, then the sentence. Never argue the general case.
 | 7 | "What is the review burden on our senior engineers?" | PR size, Devin Review, Evidence Pack structure | "One PR per Job, confined to one Processor directory, with a second agent's review attached and a structured Evidence Pack. Review becomes reading, not archaeology." |
 | 8 | "How many Jobs per week? What does it cost?" | none | Be candid: it depends on Job complexity and how many stop at characterisation. Offer a pilot on two real Jobs as the way to find out. |
 | 9 | (unspoken) The stack is not exactly Rust-on-Kubernetes | none | "Nothing here is Rust-specific. The Gate, Manifests and the skill are the method. The target language is a parameter." |
+| 10 | "Can the agent rewrite the checker or its own rules?" | Gate path check, `.github/CODEOWNERS` | "The Gate runs the PR's own harness, so it cannot guard itself - two things hold it on `main`. The Path check goes red if a diff touches any Gate input, and CODEOWNERS covers every protected path plus `Makefile`, `rust-toolchain.toml` and the agent's own rules, so required code-owner review puts any change in front of your reviewers. Follow-ups #12 (run the base branch's Gate) and #13 (Path check scope rule) land after the demo." |
 
 ## What this demo proves and does not prove
 
@@ -137,6 +140,7 @@ Proves:
 - Devin can port a stateful Job inside a Gate without touching the Gate's inputs.
 - Semantic Drift (schema-valid, wrong values) is caught, not just schema breaks.
 - A privacy-relevant change is detected from Manifest diff plus runtime scan, and reported in a form a reviewer can act on.
+- The same Gate runs on every PR in GitHub Actions, with `3. Gate verdict` as the one check `main` requires.
 - The same skill runs for the next Job.
 
 Does not prove:
@@ -153,6 +157,7 @@ Does not prove:
 | Wi-Fi dies | Terminal only. `make gate` on `main` for ota-status (green), `drift/dedup-and-idle` (red), `violation/location-in-summary` (red), `demo/charging-session-migrated` (green). Narrate the sessions from memory. |
 | Live session slow | Screen 4. Say it is yesterday's run of the same prompt. |
 | Live session edits a read-only path | It should not, because of `AGENTS.md`, but if it does: show it, say "this is exactly what Devin Review and the Gate's path check are for", switch to screen 4. |
+| Draft PR or its checks will not load | The closed rehearsal PR of `violation/location-in-summary`; if GitHub is down entirely, screen 7 and `make gate`. |
 | Someone asks to see the Scala run | `make goldens JOB=charging-session` in the terminal. Takes about a minute in Spark local mode. Only if you smoke-tested it that morning. |
 | Someone asks to see Kafka | Only if the Redpanda compose was smoke-tested that morning. Otherwise objection 3. |
 
@@ -161,9 +166,12 @@ Does not prove:
 - [ ] `make doctor` prints `doctor: ok` on this laptop.
 - [ ] `git fetch`, every demo branch at its recorded SHA (see `docs/build-plan.md`, "Demo states").
 - [ ] `make gate PROCESSOR=ota-status` green on `main`.
+- [ ] Gate build cache warm on `main`: Actions, Gate, Run workflow on `main`, `Warm the build cache (main only)` green (push-to-verdict is about 60 s warm, 3 min cold).
+- [ ] `main` ruleset on: `3. Gate verdict` required, review from Code Owners required.
 - [ ] `make gate PROCESSOR=charging-session` red on `drift/dedup-and-idle` on the Harness for fixtures 04 and 09 and on the Downstream System for fixture 09 only, every other step green.
 - [ ] `make gate PROCESSOR=charging-session` red on `violation/location-in-summary` on contract and privacy, both naming `end_location`.
-- [ ] Pre-run PR still open, Devin Review findings visible.
+- [ ] Draft PR on `violation/location-in-summary` open, `3. Gate verdict` red with privacy named; closed rehearsal PR reachable.
+- [ ] Pre-run PR still open, `3. Gate verdict` green, Devin Review findings visible.
 - [ ] Backup live-prompt session (screen 4) opens and scrolls.
 - [ ] No stray `devin/*` branches or PRs from rehearsals.
 - [ ] `.agents/skills/migrate-job/SKILL.md` and `AGENTS.md` read end to end.
