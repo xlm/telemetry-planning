@@ -110,6 +110,9 @@ verified the fix.
 
 ```
 @skills:migrate-job charging-session
+
+Push your work to a new branch named demo/charging-session-migrated
+and open the PR from it.
 ```
 
 The skill body lives at `.agents/skills/migrate-job/SKILL.md` in the demo repo.

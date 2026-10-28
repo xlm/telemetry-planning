@@ -498,9 +498,16 @@ The skill has `triggers: ["user"]`, so Devin will not auto-invoke it. That is de
 
 Only after the post-merge order above: `demo/charging-session-migrated` must carry the workflow and the new Path check rules.
 
-Start on `main`. Prompt: `@skills:migrate-job charging-session`
+Start on `main`. Prompt:
 
-Expected: a PR on a `devin/...` branch with the `3. Gate verdict` check green. Skill step 7 has Devin wait for that check and read each red `2. Gate: <name>` job log: a log with a Gate report counts toward the three attempts like a Drift, a log with no Gate report is an infrastructure failure (re-run once, then report), and after every push the Evidence Pack in the PR description is refreshed. Rename or recreate that branch as `demo/charging-session-migrated` so the demo states are stable. Leave the PR open. Trigger Devin Review on it.
+```
+@skills:migrate-job charging-session
+
+Push your work to a new branch named demo/charging-session-migrated
+and open the PR from it.
+```
+
+Expected: a PR opened from `demo/charging-session-migrated` with the `3. Gate verdict` check green. Skill step 7 has Devin wait for that check and read each red `2. Gate: <name>` job log: a log with a Gate report counts toward the three attempts like a Drift, a log with no Gate report is an infrastructure failure (re-run once, then report), and after every push the Evidence Pack in the PR description is refreshed. Leave the PR open. Trigger Devin Review on it. If Devin opens the PR from a `devin/...` branch anyway, push the same head as `demo/charging-session-migrated`, open the PR from that branch and close the other (GitHub cannot retarget a PR's head branch), so the demo states are stable.
 
 If the session stops at a stop condition, read why. If the skill or Scala is at fault, fix and re-run once. If Devin genuinely cannot determine a rule, that is also a demo moment, but prefer a clean green run for narration.
 
