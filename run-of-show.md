@@ -253,6 +253,7 @@ git ls-remote https://github.com/xlm/telemetry-migration demo/live-migration
 The ref must print `22bfe3aa090ee716354ff1ae0ee0de1a0a7a27d4`. Only if it moved, restore the frozen base from a telemetry-migration checkout:
 
 ```sh
+git fetch origin demo/live-migration
 git push --force-with-lease origin 22bfe3aa090ee716354ff1ae0ee0de1a0a7a27d4:refs/heads/demo/live-migration
 git ls-remote https://github.com/xlm/telemetry-migration demo/live-migration
 ```
