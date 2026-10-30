@@ -36,7 +36,7 @@ Paste the live prompt (below) into screen 1. Start the session. Do not watch it.
 
 Screen 2 (GitHub tree). Point at four things only:
 
-- `jobs/` - the Scala/Spark Jobs. `ota-status` (already migrated), `charging-session` (the one we are doing).
+- `jobs/` - the Scala/Spark Jobs. `ota-status` (already migrated on `main`), `charging-session` (the one we are doing), and `battery-health` (prepared in PR #22 and on `demo/live-migration`, not yet on `main`).
 - `processors/` - the Rust workspace. `ota-status` is the finished exemplar: pure core, file adapter, Kafka adapter behind a feature flag.
 - `manifests/` - one YAML per Job and per Processor: what fields are read, derived, emitted, logged, and their classification.
 - `evidence/ota-status/` - the Evidence Pack the first Migration produced. "This is what done looks like. The question is how to get the next one for the price of a prompt."
@@ -76,7 +76,7 @@ Whichever happens, screen 6 for ten seconds: the read-only section of `AGENTS.md
 
 ### 11:00 - 13:00 Repeat for Job #3 and what humans keep
 
-Screen 5 again, one sentence: "Battery-health is next. `@skills:migrate-job battery-health`. Same procedure, different argument."
+Screen 5 again, one sentence: "Battery-health is next. `@skills:migrate-job battery-health [target-branch]`. Same procedure, different argument. Omit the target for `main`, or use `demo/live-migration` for the three-Job format below."
 
 Then what humans keep, in this order: architectural approval, privacy sign-off on the Evidence Pack, the cutover decision. Screen 8, `docs/cutover.md`, one sentence: "Shadow consumer group, shadow topic, idempotent producer, offset handoff. Documented, not demonstrated, because it depends on your deployment pipeline, which already exists."
 
@@ -116,6 +116,149 @@ and open the PR from it.
 ```
 
 The skill body lives at `.agents/skills/migrate-job/SKILL.md` in the demo repo.
+
+## Three-Job live migration format
+
+This is an alternative to the charging-session storyline above. Use the frozen `demo/live-migration` branch at `22bfe3aa090ee716354ff1ae0ee0de1a0a7a27d4`. All three Processors are unfinished there. Only this branch strips the OTA core. `main` keeps its working OTA implementation. Battery-health and the prepared format are in PR #22, not yet on `main`. The platform-preparation PR's protected-path Gate is expected red. Do not bypass it or merge that PR to start the demo.
+
+### Screens and steps
+
+1. Open the repo on `demo/live-migration`, with the Scala source and Rust scaffold visible.
+2. Open session 1 on that branch and paste prompt 1. Show the OTA characterisation, Rust change, PR and Evidence Pack.
+3. In the same session, paste prompt 2. Show the existing repo skill and any small refinements. This is capture/review of a prepared skill, not a claim to create it from nothing.
+4. Open a new supervising session on the same demo branch and paste prompt 3. Show exactly two child-session links, charging-session and battery-health.
+5. Show the independent PRs targeting `demo/live-migration`, their Evidence Packs and actual `3. Gate verdict` checks. Never merge any of the three PRs or push to the demo base.
+
+### Prompt 1: simple live migration
+
+Paste into the first session:
+
+```text
+Use xlm/telemetry-migration. Prepare a live migration of ota-status only.
+Fetch origin/demo/live-migration and make your own feature branch from it.
+Do not use main, restore an answer from history, or push to the demo base.
+Before editing, confirm the base has the intentional OTA core todo!()
+and that charging-session and battery-health are also unfinished.
+Stop and report if the starting state differs.
+
+Read CONTEXT.md and AGENTS.md. Read the Scala Job under jobs/ota-status/
+as the specification, including validation, DLQ reasons, status aliases,
+case handling, clamping, output version, ordering and privacy. Do not infer
+semantics from field names. Characterise the rules with Scala line
+citations in processors/ota-status/CHARACTERISATION.md. Mark state,
+deduplication and timeouts as not applicable if the Job has none.
+
+Implement the Rust pure core and unit tests, reusing telemetry-core and
+the existing JSONL wrapper. Compare the characterisation to the Baseline.
+Only change processors/ota-status/ and, if necessary, its Processor
+Manifest. Never edit the Scala, fixtures, Goldens, schemas, contracts,
+Harness, Baseline, downstream checks or Gate workflow to get a pass.
+
+Run the OTA Rust tests, make fmt and make lint. Commit the implementation.
+From a clean tree, run:
+make gate PROCESSOR=ota-status BASE=origin/demo/live-migration
+
+Read any Drift against the Scala, fix only the Processor, commit and rerun.
+Stop after three attempts on the same Drift or if a fix needs protected
+inputs. Open a PR targeting demo/live-migration, never main. Include the
+latest clean-commit Evidence Pack verbatim, resolved Drifts and residual
+uncertainty in the PR description. Keep generated evidence out of commits.
+Wait for 3. Gate verdict, fix legitimate Processor failures and report the
+PR URL and check status. Do not merge. Do not migrate the other two Jobs.
+```
+
+### Prompt 2: capture the procedure as a repo skill
+
+Paste into the completed live-migration session:
+
+```text
+Capture the procedure we just followed as the reusable migrate-job skill
+at .agents/skills/migrate-job/SKILL.md. The repo already has a prepared
+version: compare and refine it, do not claim you created it from nothing.
+Show me the resulting file and the smallest changes needed, if any.
+
+Parameterise the Job name and PR target branch. Use main by default and
+demo/live-migration explicitly for this demo. Preserve Scala-as-spec,
+characterisation, the Baseline/privacy boundary, per-Processor diff scope,
+tests, a clean-commit Gate run using the target branch as BASE, Evidence
+Pack in the PR description, stop conditions and no automatic merging.
+
+Do not hard-code OTA business rules or weaken any Gate. Keep a matching
+existing skill unchanged. Do not append skill edits to the migration PR
+or publish another PR without asking. This step is a capture/review, not
+another migration. The prepared skill on the demo base is what the two
+child sessions will reuse.
+```
+
+### Prompt 3: supervising Devin fans out to two Jobs
+
+Paste into a new supervising session:
+
+```text
+Supervise two parallel migrations in xlm/telemetry-migration. Do not
+implement either migration yourself. Use the child-session tools and
+their managing-child-sessions guidance to create exactly two children.
+Do not use a workflow or launch an OTA migration.
+
+Fetch origin/demo/live-migration, inspect it, and confirm charging-session
+and battery-health both have intentional Rust core todo!() scaffolds.
+Read CONTEXT.md, AGENTS.md and .agents/skills/migrate-job/SKILL.md there.
+Stop and report if the prepared base or skill is absent or already
+migrated. Record the demo base SHA and give the same SHA to both children.
+
+Child 1: migrate-job charging-session demo/live-migration
+Child 2: migrate-job battery-health demo/live-migration
+
+Give each child its own session and feature branch starting from that
+exact demo base SHA, with the shared target ref origin/demo/live-migration.
+Tell each to read and follow the repo skill, substituting its Job name
+and target branch. Include the repository, CONTEXT.md and AGENTS.md in each
+prompt, and explicitly prohibit pushes to main or the demo base. Each
+child must only modify its own Processor and Processor Manifest. No
+shared branch, protected inputs, manual Goldens, or policy relaxation.
+
+Each child must characterise its Scala source, implement and test its
+Processor, commit it, then run its own Gate with
+BASE=origin/demo/live-migration. It must open one PR targeting
+demo/live-migration, include the latest clean-commit Evidence Pack and
+wait for 3. Gate verdict. Generated evidence belongs in the PR body, not
+another commit. Do not merge any PR.
+
+Show both child-session links as soon as they exist. Monitor their
+notifications, route legitimate fixes back to the responsible child,
+and escalate blockers instead of guessing or weakening the Gate. Finish
+with one concise table: Job, child session, PR, actual CI Gate verdict,
+Drifts resolved and residual uncertainty. Do not report success until
+both PRs have a green 3. Gate verdict, or explicitly report what blocked
+them. Do not create more children.
+```
+
+### Expectations
+
+- OTA and battery are small stateless examples. Charging is the more involved stateful example.
+- Battery clamps SOH to 0..100, uses health thresholds 60 and 80, emits schema version 1 and retains available IDs on DLQ.
+- Red Gates before migration are intentional. Each actual migration must pass its own CI Gate. A green verdict is evidence for human review, not approval or a production safety claim.
+- Child provisioning, implementation and CI happen live. Completion time is not guaranteed. Preparation alone is not a three-migration rehearsal.
+- Evidence Packs stay in PR bodies. The skill takes `<job-name> [target-branch]`, defaults to `main`, and uses `BASE=origin/<target>`. Always supply `demo/live-migration` here.
+
+### Three-Job live format reset
+
+After a practice run, archive the OTA, supervising and child sessions. Close open PRs targeting the demo branch and delete their feature branches:
+
+```sh
+gh pr list -R xlm/telemetry-migration --base demo/live-migration --json number --jq '.[].number' | xargs -I{} gh pr close {} -R xlm/telemetry-migration --delete-branch
+git ls-remote https://github.com/xlm/telemetry-migration demo/live-migration
+```
+
+The ref must print `22bfe3aa090ee716354ff1ae0ee0de1a0a7a27d4`. Only if it moved, restore the frozen base from a telemetry-migration checkout:
+
+```sh
+git push --force-with-lease origin 22bfe3aa090ee716354ff1ae0ee0de1a0a7a27d4:refs/heads/demo/live-migration
+git ls-remote https://github.com/xlm/telemetry-migration demo/live-migration
+```
+
+Only `main` has a ruleset. The demo branch is unprotected, so do not rely on GitHub to prevent an accidental merge or push. Routine retries start new sessions from the frozen base, without resetting it. The conditional restore above is only for a moved base.
+
 
 ## Objection script
 
@@ -177,5 +320,6 @@ Does not prove:
 - [ ] Pre-run PR still open, `3. Gate verdict` green, Devin Review findings visible.
 - [ ] Backup live-prompt session (screen 4) opens and scrolls.
 - [ ] No stray `devin/*` branches or PRs from rehearsals.
+- [ ] Three-Job format reset complete: sessions archived, demo-target PRs closed with branch deletion, remote base confirmed at `22bfe3aa090ee716354ff1ae0ee0de1a0a7a27d4`. Restore only if it moved (reset above).
 - [ ] `.agents/skills/migrate-job/SKILL.md` and `AGENTS.md` read end to end.
 - [ ] Laptop on power, notifications off, terminal font large.
