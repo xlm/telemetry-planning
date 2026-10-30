@@ -19,7 +19,7 @@ The expensive part of moving the remaining Jobs is not writing Rust, it is provi
 7. Terminal in a local clone, on `violation/location-in-summary`, with `make gate PROCESSOR=charging-session` typed but not run (fallback for screen 11).
 8. `docs/cutover.md` rendered.
 9. DeepWiki page for the repo (optional, objection 5).
-10. GitHub: the demo PR's checks - the `3. Gate verdict` summary page (per-Processor result table, green) and, one click in, the `2. Gate: charging-session` summary page showing the same Evidence Pack.
+10. GitHub: the demo PR's checks - the `3. Gate verdict` summary page (per-Processor result table, green) and, one click in, the `2. Gate (charging-session)` summary page showing the same Evidence Pack.
 11. GitHub: the draft PR from `violation/location-in-summary` into `main` - its `3. Gate verdict` summary page open, red, with privacy named in the result table.
 
 Do not have a slide deck open. The repo and the sessions are the deck.
@@ -45,7 +45,7 @@ If the Architect asks how Devin learns an undocumented Job: screen 9, DeepWiki, 
 
 ### 3:00 - 7:00 The pre-run Migration
 
-Screen 5 for 30 seconds: the `migrate-job` skill. Read the step headings, the stop conditions and the acceptance criteria out loud. Step 7 is worth the extra seconds: Devin waits for the `3. Gate verdict` check, reads each red `2. Gate: <name>` job log (a Gate report counts toward the three attempts like a Drift; no report is an infrastructure failure, re-run once then report), and refreshes the Evidence Pack in the PR description after every push. Acceptance is `3. Gate verdict` green on the PR, not a local run. "Every Job from here on starts with this. It is a file in the repo, so your architects review changes to the process the same way they review code."
+Screen 5 for 30 seconds: the `migrate-job` skill. Read the step headings, the stop conditions and the acceptance criteria out loud. Step 7 is worth the extra seconds: Devin waits for the `3. Gate verdict` check, reads each red `2. Gate (<name>)` job log (a Gate report counts toward the three attempts like a Drift; no report is an infrastructure failure, re-run once then report), and refreshes the Evidence Pack in the PR description after every push. Acceptance is `3. Gate verdict` green on the PR, not a local run. "Every Job from here on starts with this. It is a file in the repo, so your architects review changes to the process the same way they review code."
 
 Screen 3: the completed session. Scroll, do not read. Narrate the shape:
 
@@ -54,13 +54,13 @@ Screen 3: the completed session. Scroll, do not read. Narrate the shape:
 3. It ran the Gate. Show the first red Gate if there was one in the session, then the green one.
 4. It generated the Evidence Pack, opened the PR, and waited for `3. Gate verdict` to go green (step 7).
 
-Screen 2: the PR. Three things: diff is confined to `processors/charging-session/` and `manifests/charging-session.processor.yaml`. Evidence Pack in the description. Devin Review findings below it. Then screen 10 for five seconds: `3. Gate verdict` green - the one check `main` requires - its summary page tables each Processor's result, and the `2. Gate: charging-session` summary shows the same Evidence Pack. "Devin Review is a second agent reviewing the first. A human still merges."
+Screen 2: the PR. Three things: diff is confined to `processors/charging-session/` and `manifests/charging-session.processor.yaml`. Evidence Pack in the description. Devin Review findings below it. Then screen 10 for five seconds: `3. Gate verdict` green - the one check `main` requires - its summary page tables each Processor's result, and the `2. Gate (charging-session)` summary shows the same Evidence Pack. "Devin Review is a second agent reviewing the first. A human still merges."
 
 Say the honest sentence once: "The Gate proves equivalence on these fixtures, under these checks. It does not prove production safety. What it does is turn a two-week discovery exercise into a 20-minute read."
 
 ### 7:00 - 9:00 The Gate going red for privacy
 
-Screen 11. Say: "Here is a draft PR where the port looks fine and the Harness is green, but the Processor copies the vehicle's last location onto the session summary." `3. Gate verdict` is red, the per-Processor table naming privacy. Open the `2. Gate: charging-session` summary - the Evidence Pack's finding: field `end_location`, classification `sensitive-location`, not permitted on topic `vehicle.charging.sessions`, Baseline unchanged, disposition `policy violation - requires remediation`. If the checks will not load, fall back to the closed rehearsal PR of the same branch; if GitHub is down entirely, screen 7: run `make gate PROCESSOR=charging-session`, same finding in the terminal.
+Screen 11. Say: "Here is a draft PR where the port looks fine and the Harness is green, but the Processor copies the vehicle's last location onto the session summary." `3. Gate verdict` is red, the per-Processor table naming privacy. Open the `2. Gate (charging-session)` summary - the Evidence Pack's finding: field `end_location`, classification `sensitive-location`, not permitted on topic `vehicle.charging.sessions`, Baseline unchanged, disposition `policy violation - requires remediation`. If the checks will not load, fall back to the closed rehearsal PR of the same branch; if GitHub is down entirely, screen 7: run `make gate PROCESSOR=charging-session`, same finding in the terminal.
 
 Say: "Nobody rewrote the policy to make this pass, and the Evidence Pack tells a privacy reviewer exactly which field and which rule. That is what 'no lengthy review per Job' actually means: the reviewer reads this, not the code."
 

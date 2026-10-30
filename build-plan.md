@@ -237,7 +237,7 @@ The Markdown must be readable in a PR description. Keep it under 150 lines.
 Every pull request also runs the Gate in GitHub Actions (`.github/workflows/gate.yml`), as three numbered jobs:
 
 1. `1. Select Processors` runs `gate-processors --base origin/<base_ref>`: a Processor's own crate or `manifests/<name>.processor.yaml` selects that Processor; a Gate input, `Makefile`, `rust-toolchain.toml` or any other path under `processors/` selects every Processor; anything else selects none.
-2. `2. Gate: <name>`, one job per selected Processor, runs `make gate` on the PR head commit. Its job summary page shows the Evidence Pack, and it uploads `gate-<name>` (evidence plus raw output) and `result-<name>` (the final `Gate: ...` line) as artifacts.
+2. `2. Gate (<name>)`, one job per selected Processor (the job is named `2. Gate` and GitHub appends the matrix value), runs `make gate` on the PR head commit. Its job summary page shows the Evidence Pack, and it uploads `gate-<name>` (evidence plus raw output) and `result-<name>` (the final `Gate: ...` line) as artifacts.
 3. `3. Gate verdict` aggregates everything: green iff step 1 succeeded and every selected Processor recorded `Gate: GREEN`, with a skipped `2. Gate` counting as green (a PR may select no Processor). It runs with `if: always()` because GitHub treats a skipped required check as passing. Its summary page tables each Processor's result. It is the only check `main` requires, because the number of `2. Gate` jobs varies per PR. This check on the PR head commit is the verdict that counts; a local `make gate` is a preview of it.
 
 The Gate runs the PR's own `harness/` and workflow, so the Path check cannot guard itself: a branch that drops a rule and edits the harness would pass its own Gate. GitHub reads CODEOWNERS from the base branch, so "Require review from Code Owners" on `main` closes that gap.
@@ -484,7 +484,7 @@ Read both files once more before pushing; the SKILL.md is the thing you show on 
 1. Rebase-merge #10 (the Gate in GitHub Actions) with the admin bypass. Its own `3. Gate verdict` is red at Path check by design, because it touches Gate inputs.
 2. Confirm `Warm the build cache (main only)` passes on `main`.
 3. Add the `main` ruleset: `3. Gate verdict` as the only required check, Require review from Code Owners, rebase only, linear history, 1 approval, dismiss stale approvals, admin bypass for pull requests only.
-4. Land the executive-facing Evidence Pack PR - a separate PR to make Evidence Packs friendlier for executives, designed first - so it is on `main` before the D2 cut.
+4. Land the executive-facing Evidence Pack PR - a separate PR to make Evidence Packs friendlier for executives, designed first - so it is on `main` before the D2 cut. Done: #17 (executive Evidence Pack headline), with #14 renaming the matrix jobs to `2. Gate (<name>)`.
 
 Cut no demo branch before this lands: a branch without the workflow never reports `3. Gate verdict`, and one cut before #10 merges carries the old Path check rules (no `.github/`, `schemas/` or `manifests/classification.yaml`).
 
@@ -507,7 +507,7 @@ Push your work to a new branch named demo/charging-session-migrated
 and open the PR from it.
 ```
 
-Expected: a PR opened from `demo/charging-session-migrated` with the `3. Gate verdict` check green. Skill step 7 has Devin wait for that check and read each red `2. Gate: <name>` job log: a log with a Gate report counts toward the three attempts like a Drift, a log with no Gate report is an infrastructure failure (re-run once, then report), and after every push the Evidence Pack in the PR description is refreshed. Leave the PR open. Trigger Devin Review on it. If Devin opens the PR from a `devin/...` branch anyway, push the same head as `demo/charging-session-migrated`, open the PR from that branch and close the other (GitHub cannot retarget a PR's head branch), so the demo states are stable.
+Expected: a PR opened from `demo/charging-session-migrated` with the `3. Gate verdict` check green. Skill step 7 has Devin wait for that check and read each red `2. Gate (<name>)` job log: a log with a Gate report counts toward the three attempts like a Drift, a log with no Gate report is an infrastructure failure (re-run once, then report), and after every push the Evidence Pack in the PR description is refreshed. Leave the PR open. Trigger Devin Review on it. If Devin opens the PR from a `devin/...` branch anyway, push the same head as `demo/charging-session-migrated`, open the PR from that branch and close the other (GitHub cannot retarget a PR's head branch), so the demo states are stable.
 
 If the session stops at a stop condition, read why. If the skill or Scala is at fault, fix and re-run once. If Devin genuinely cannot determine a rule, that is also a demo moment, but prefer a clean green run for narration.
 
@@ -518,7 +518,7 @@ From `demo/charging-session-migrated`:
 - `drift/dedup-and-idle`: change the dedup key to `event_id` and make the idle timeout use a wall-clock `Instant` instead of the Vehicle Clock. Keep the code plausible, as if written by someone who had not read the Scala carefully. Confirm `make gate` is red on the Harness for exactly fixtures 04 (extra accepted events, wrong `event_count`) and 09 (missing `TIMEOUT` summaries), green on every other fixture, red on the Downstream System for exactly fixture 09 (its 8 `TIMEOUT` flags missing), and green on contract and privacy. Record the SHA.
 - `violation/location-in-summary`: add `end_location` to the Rust summary struct, populated from the last accepted event's `location`, without touching the manifest or the contract. Confirm `make gate` is red on contract (`additionalProperties`), red on privacy (undeclared field carrying a sensitive-location value on an output topic), and that the Harness shows extra-field diffs on every fixture. Record the SHA.
 
-Then open a draft PR from `violation/location-in-summary` into `main` and keep it open: `3. Gate verdict` goes red with privacy named in the result table, and the `2. Gate: charging-session` summary page shows the Evidence Pack's finding. It is the privacy beat's visual in the run of show; its fallbacks are a closed rehearsal PR of the same branch and the terminal.
+Then open a draft PR from `violation/location-in-summary` into `main` and keep it open: `3. Gate verdict` goes red with privacy named in the result table, and the `2. Gate (charging-session)` summary page shows the Evidence Pack's finding. It is the privacy beat's visual in the run of show; its fallbacks are a closed rehearsal PR of the same branch and the terminal.
 
 ### D4 - Backup run of the live prompt
 
