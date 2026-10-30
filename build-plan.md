@@ -6,7 +6,7 @@ Decisions already made (do not reopen during the build): see the "Shared underst
 
 ## Repo layout
 
-Battery-health entries below are prepared in PR #22 and on `demo/live-migration`, not yet on `main`. The original two-Job build phases remain below.
+Battery-health and the skill's optional target-branch argument are on `main`. The frozen `demo/live-migration` branch differs from `main` only by its stripped OTA core. The original two-Job build phases remain below.
 
 ```
 telemetry-migration/
@@ -170,7 +170,7 @@ No `location` field on the summary, ever. No `location` in logs, ever. `vehicle_
 
 Input topic `vehicle.ota.events`: `{event_id, vehicle_id, campaign_id, status, progress_pct, event_ts, schema_version}`. Stateless. Normalise `status` case-insensitively from `{downloading, dl, download}` to `DOWNLOADING`, `{installing, inst}` to `INSTALLING`, `{done, complete, success}` to `SUCCEEDED`, `{failed, error}` to `FAILED`, anything else to DLQ reason `UNKNOWN_STATUS`. Clamp `progress_pct` into 0..100. Emit to `vehicle.ota.status` keyed by `vehicle_id`: `{event_id, vehicle_id, campaign_id, status, progress_pct, event_ts, schema_version: "1"}`.
 
-### Battery-health Job rules (Job #3, PR #22)
+### Battery-health Job rules (Job #3, scaffold on main)
 
 Small stateless Job. Input topic `vehicle.battery.events`: `{event_id, vehicle_id, battery_id, soh_pct, event_ts, schema_version}`. Require string IDs, numeric SOH and an integral timestamp. Invalid input goes to `vehicle.battery.dlq` with `MISSING_FIELD`, retaining available `event_id` and `vehicle_id` on a parsed object. Clamp SOH to 0..100. Health is `HEALTHY` at >=80, `DEGRADED` at >=60, otherwise `REPLACE`. Emit the IDs, clamped `soh_pct`, `health`, `event_ts` and `schema_version: "1"` to `vehicle.battery.health`. No state, deduplication or timeouts. The Baseline permits maintenance output, forbids location logging and requires hashed `vehicle_id` in logs. Fixtures, Scala-generated Goldens, contract, input schema, both Manifests and a Rust `todo!()` scaffold are prepared, not a completed migration.
 
@@ -558,7 +558,7 @@ The skill invocation is `@skills:migrate-job <job> [target-branch]`. The target 
 | Branch | State | Gate for charging-session | Used for |
 |---|---|---|---|
 | `demo/live-migration` | all three Processors unfinished, SHA `22bfe3aa090ee716354ff1ae0ee0de1a0a7a27d4` | red (todo!) | three-Job live format |
-| `main` | Job #1 migrated, Job #2 Scala + Goldens + Rust scaffold | red (todo!) | pre-run session start |
+| `main` | Job #1 migrated, Jobs #2 and #3 Scala + Goldens + Rust scaffolds | red (todo!) | pre-run session start |
 | `demo/charging-session-migrated` | Devin's green port, PR open | green | narration, PR, Devin Review |
 | `drift/dedup-and-idle` | port with two planted Drifts | red on Harness 04 and 09, Downstream System 09 | live session start, backup session |
 | `violation/location-in-summary` | port leaking location | red, contract + privacy | draft PR (red `3. Gate verdict` at privacy); terminal fallback |
