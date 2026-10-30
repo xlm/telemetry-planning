@@ -36,7 +36,7 @@ Paste the live prompt (below) into screen 1. Start the session. Do not watch it.
 
 Screen 2 (GitHub tree). Point at four things only:
 
-- `jobs/` - the Scala/Spark Jobs. `ota-status` (already migrated on `main`), `charging-session` (the one we are doing), and `battery-health` (prepared in PR #22 and on `demo/live-migration`, not yet on `main`).
+- `jobs/` - the Scala/Spark Jobs. `ota-status` (already migrated on `main`), `charging-session` (the one we are doing), and `battery-health` (Job and Rust scaffold on `main`).
 - `processors/` - the Rust workspace. `ota-status` is the finished exemplar: pure core, file adapter, Kafka adapter behind a feature flag.
 - `manifests/` - one YAML per Job and per Processor: what fields are read, derived, emitted, logged, and their classification.
 - `evidence/ota-status/` - the Evidence Pack the first Migration produced. "This is what done looks like. The question is how to get the next one for the price of a prompt."
@@ -119,7 +119,7 @@ The skill body lives at `.agents/skills/migrate-job/SKILL.md` in the demo repo.
 
 ## Three-Job live migration format
 
-This is an alternative to the charging-session storyline above. Use the frozen `demo/live-migration` branch at `22bfe3aa090ee716354ff1ae0ee0de1a0a7a27d4`. All three Processors are unfinished there. Only this branch strips the OTA core. `main` keeps its working OTA implementation. Battery-health and the prepared format are in PR #22, not yet on `main`. The platform-preparation PR's protected-path Gate is expected red. Do not bypass it or merge that PR to start the demo.
+This is an alternative to the charging-session storyline above. Use the frozen `demo/live-migration` branch at `22bfe3aa090ee716354ff1ae0ee0de1a0a7a27d4`. All three Processors are unfinished there. Battery-health and the skill's optional target-branch argument are on `main`. The demo branch differs from `main` only by its stripped OTA core. `main` keeps its working OTA implementation.
 
 ### Screens and steps
 
